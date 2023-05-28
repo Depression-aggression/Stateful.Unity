@@ -1,26 +1,30 @@
-// Copyright © 2022 Nikolay Melnikov. All rights reserved.
+// Copyright © 2022-2023 Nikolay Melnikov. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
-using Depra.StateMachines.Application;
-using Depra.StateMachines.Domain;
+using System;
+using Depra.StateMachines.Abstract;
+using Depra.StateMachines.Finite;
 using UnityEngine;
+using UnityEngine.Events;
+using static Depra.StateMachines.Unity.Runtime.Constants;
 
 namespace Depra.StateMachines.Unity.Runtime
 {
+    [AddComponentMenu(MODULE_PATH + F_STATE_MACHINE)]
     [RequireComponent(typeof(StateMachineInitialization))]
-    public class StateMachineBehaviour : MonoBehaviour
+    public sealed class StateMachineBehaviour : MonoBehaviour, IStateMachine
     {
         [SerializeField] private StateBehavior _startingState;
         [SerializeField] private StateBehavior _currentState;
+        [SerializeField] private UnityEvent<StateBehavior> _onStateChanged;
 
-        [Tooltip("Can States within this StateMachine be reentered?")] [SerializeField]
-        private bool _allowReentry;
-
+        [Tooltip("Can States within this StateMachine be reentered?")]
+        [SerializeField] private bool _allowReentry;
         [SerializeField] private bool _verbose;
 
         private IStateMachine _stateMachine;
 
-        public StateBehavior CurrentState => _currentState;
+        public event Action<IState> StateChanged;
 
         /// <summary>
         /// Are we at the first state in this state machine.
@@ -32,20 +36,31 @@ namespace Depra.StateMachines.Unity.Runtime
         /// </summary>
         public bool AtLast { get; private set; }
 
-        private IStateMachine StateMachine => _stateMachine ??= new StateMachine(_startingState);
+        /// <summary>
+        /// Returns the current state.
+        /// </summary>
+        public StateBehavior CurrentState => _currentState;
 
-        private void Update()
-        {
-            Tick();
-        }
+        private IStateMachine StateMachine =>
+            _stateMachine ??= new StateMachine(_startingState);
+
+        /// <summary>
+        /// Returns the current state.
+        /// <remarks>For compatibility with <see cref="IStateMachine"/> interface.</remarks>
+        /// </summary>
+        IState IStateMachine.CurrentState => _currentState;
+
+        private void OnDestroy() =>
+            StateMachine.StateChanged += OnStateChanged;
 
         /// <summary>
         /// Internally used within the framework to auto start the state machine.
         /// </summary>
         public void StartMachine()
         {
-            // Start the machine:
-            if (UnityEngine.Application.isPlaying && _startingState != null)
+            StateMachine.StateChanged += OnStateChanged;
+
+            if (Application.isPlaying && _startingState != null)
             {
                 ChangeState(_startingState);
             }
@@ -132,7 +147,7 @@ namespace Depra.StateMachines.Unity.Runtime
         }
 
         /// <summary>
-        /// Changes the state by sibling index.
+        /// Changes the state by state instance.
         /// </summary>
         /// <param name="state">New state</param>
         public StateBehavior ChangeState(StateBehavior state)
@@ -183,7 +198,7 @@ namespace Depra.StateMachines.Unity.Runtime
             if (found == false)
             {
                 Log($"{name} does not contain a state by the name of {state} " +
-                    $"please verify the name of the state you are trying to reach.");
+                    "please verify the name of the state you are trying to reach.");
 
                 return null;
             }
@@ -213,12 +228,10 @@ namespace Depra.StateMachines.Unity.Runtime
             Log($"(+) {name} ENTERED state {state.name}");
         }
 
-        private void Tick()
+        private void OnStateChanged(IState currentState)
         {
-            if (StateMachine.NeedTransition(out var nextState))
-            {
-                Enter(nextState as StateBehavior);
-            }
+            StateChanged?.Invoke(currentState);
+            _onStateChanged.Invoke(_currentState);
         }
 
         private void Log(string message)
@@ -228,5 +241,13 @@ namespace Depra.StateMachines.Unity.Runtime
                 Debug.Log(message, gameObject);
             }
         }
+
+        /// <summary>
+        /// Changes the state by state instance.
+        /// </summary>
+        /// <remarks>For compatibility with the <see cref="IStateMachine"/> interface.</remarks>
+        /// <param name="state">New state</param>
+        void IStateMachine.ChangeState(IState state) =>
+            ChangeState(state as StateBehavior);
     }
 }

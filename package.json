@@ -1,7 +1,7 @@
 {
   "name": "com.depra.statemachines.unity",
   "displayName": "Depra.StateMachines.Unity",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "unity": "2021.3",
   "hideInEditor": false,
   "keywords": [
@@ -13,5 +13,5 @@
   "license": "Apache-2.0",
   "description": "Integration module for UnityEngine to support state machines",
   "type": "module",
-  "unityRelease": "11f1"
+  "unityRelease": "24f1"
 }
