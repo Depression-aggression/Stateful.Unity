@@ -20,7 +20,7 @@ namespace Depra.StateMachines.Unity.Runtime
         /// <summary>
         /// Internally used within the framework to auto start the state machine.
         /// </summary>
-        public void Initialize()
+        private void Initialize()
         {
             // Turn off all states:
             for (var i = 0; i < transform.childCount; i++)

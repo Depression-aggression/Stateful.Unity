@@ -9,7 +9,7 @@ using static Depra.StateMachines.Unity.Runtime.Constants;
 namespace Depra.StateMachines.Unity.Runtime
 {
     [AddComponentMenu(MODULE_PATH + F_STATE)]
-    public class StateBehavior : MonoBehaviour, IState
+    public sealed class StateBehavior : MonoBehaviour, IState
     {
         [SerializeField] private UnityEvent _onEnter;
         [SerializeField] private UnityEvent _onExit;

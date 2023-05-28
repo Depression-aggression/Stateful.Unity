@@ -4,6 +4,7 @@
 using System;
 using Depra.StateMachines.Abstract;
 using Depra.StateMachines.Finite;
+using JetBrains.Annotations;
 using UnityEngine;
 using UnityEngine.Events;
 using static Depra.StateMachines.Unity.Runtime.Constants;
@@ -18,8 +19,9 @@ namespace Depra.StateMachines.Unity.Runtime
         [SerializeField] private StateBehavior _currentState;
         [SerializeField] private UnityEvent<StateBehavior> _onStateChanged;
 
-        [Tooltip("Can States within this StateMachine be reentered?")]
-        [SerializeField] private bool _allowReentry;
+        [Tooltip("Can States within this StateMachine be reentered?")] [SerializeField]
+        private bool _allowReentry;
+
         [SerializeField] private bool _verbose;
 
         private IStateMachine _stateMachine;
@@ -29,20 +31,20 @@ namespace Depra.StateMachines.Unity.Runtime
         /// <summary>
         /// Are we at the first state in this state machine.
         /// </summary>
+        [UsedImplicitly]
         public bool AtFirst { get; private set; }
 
         /// <summary>
         /// Are we at the last state in this state machine.
         /// </summary>
+        [UsedImplicitly]
         public bool AtLast { get; private set; }
 
         /// <summary>
         /// Returns the current state.
         /// </summary>
+        [UsedImplicitly]
         public StateBehavior CurrentState => _currentState;
-
-        private IStateMachine StateMachine =>
-            _stateMachine ??= new StateMachine(_startingState);
 
         /// <summary>
         /// Returns the current state.
@@ -50,15 +52,21 @@ namespace Depra.StateMachines.Unity.Runtime
         /// </summary>
         IState IStateMachine.CurrentState => _currentState;
 
-        private void OnDestroy() =>
-            StateMachine.StateChanged += OnStateChanged;
+        private void OnDestroy()
+        {
+            if (_stateMachine != null)
+            {
+                _stateMachine.StateChanged += OnStateChanged;
+            }
+        }
 
         /// <summary>
         /// Internally used within the framework to auto start the state machine.
         /// </summary>
         public void StartMachine()
         {
-            StateMachine.StateChanged += OnStateChanged;
+            _stateMachine = new StateMachine(_startingState, _allowReentry);
+            _stateMachine.StateChanged += OnStateChanged;
 
             if (Application.isPlaying && _startingState != null)
             {
@@ -69,6 +77,7 @@ namespace Depra.StateMachines.Unity.Runtime
         /// <summary>
         /// Change to the next state if possible.
         /// </summary>
+        [UsedImplicitly]
         public StateBehavior Next(bool exitIfLast = false)
         {
             if (_currentState == null)
@@ -94,6 +103,7 @@ namespace Depra.StateMachines.Unity.Runtime
         /// <summary>
         /// Change to the previous state if possible.
         /// </summary>
+        [UsedImplicitly]
         public StateBehavior Previous(bool exitIfFirst = false)
         {
             if (_currentState == null)
@@ -119,6 +129,7 @@ namespace Depra.StateMachines.Unity.Runtime
         /// <summary>
         /// Exit the current state.
         /// </summary>
+        [UsedImplicitly]
         public void Exit()
         {
             if (_currentState == null)
@@ -150,6 +161,7 @@ namespace Depra.StateMachines.Unity.Runtime
         /// Changes the state by state instance.
         /// </summary>
         /// <param name="state">New state</param>
+        [UsedImplicitly]
         public StateBehavior ChangeState(StateBehavior state)
         {
             if (_currentState)
@@ -176,6 +188,7 @@ namespace Depra.StateMachines.Unity.Runtime
         /// Changes the state by sibling index.
         /// </summary>
         /// <param name="childIndex">Sibling index</param>
+        [UsedImplicitly]
         public StateBehavior ChangeState(int childIndex)
         {
             if (childIndex > transform.childCount - 1)
@@ -192,6 +205,7 @@ namespace Depra.StateMachines.Unity.Runtime
         /// </summary>
         /// <param name="state">State name</param>
         /// <returns></returns>
+        [UsedImplicitly]
         public StateBehavior ChangeState(string state)
         {
             var found = transform.Find(state);
@@ -223,7 +237,7 @@ namespace Depra.StateMachines.Unity.Runtime
                 AtLast = true;
             }
 
-            StateMachine.ChangeState(state);
+            _stateMachine.ChangeState(state);
 
             Log($"(+) {name} ENTERED state {state.name}");
         }
