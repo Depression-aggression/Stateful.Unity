@@ -1,29 +1,31 @@
-// Copyright © 2022 Nikolay Melnikov. All rights reserved.
+// Copyright © 2022-2023 Nikolay Melnikov. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
-using Depra.StateMachines.Abstract;
+using Depra.Stateful.Abstract;
 using UnityEngine;
 using UnityEngine.Events;
-using static Depra.StateMachines.Unity.Runtime.Constants;
+using static Depra.Stateful.Unity.Runtime.Constants;
 
-namespace Depra.StateMachines.Unity.Runtime
+namespace Depra.Stateful.Unity.Runtime
 {
-    [AddComponentMenu(MODULE_PATH + F_STATE)]
-    public sealed class StateBehavior : MonoBehaviour, IState
-    {
-        [SerializeField] private UnityEvent _onEnter;
-        [SerializeField] private UnityEvent _onExit;
+	[AddComponentMenu(MODULE_PATH + DISPLAY_NAME)]
+	public sealed class StateBehavior : MonoBehaviour, IState
+	{
+		private const string DISPLAY_NAME = "State";
 
-        public void Enter()
-        {
-            gameObject.SetActive(true);
-            _onEnter.Invoke();
-        }
+		[SerializeField] private UnityEvent _onEnter;
+		[SerializeField] private UnityEvent _onExit;
 
-        public void Exit()
-        {
-            gameObject.SetActive(false);
-            _onExit.Invoke();
-        }
-    }
+		public void Enter()
+		{
+			gameObject.SetActive(true);
+			_onEnter.Invoke();
+		}
+
+		public void Exit()
+		{
+			gameObject.SetActive(false);
+			_onExit.Invoke();
+		}
+	}
 }

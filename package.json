@@ -1,14 +1,16 @@
 {
-  "name": "com.depra.statemachines.unity",
-  "displayName": "Depra.StateMachines.Unity",
-  "version": "1.0.1",
+  "name": "com.depra.stateful.unity",
+  "displayName": "Depra.Stateful.Unity",
+  "version": "1.1.0",
   "unity": "2021.3",
   "hideInEditor": false,
   "keywords": [
+    "Depra",
+    "Stateful",
     "State",
     "Machine",
     "FSM",
-    "Unity"
+    "Runtime"
   ],
   "license": "Apache-2.0",
   "description": "Integration module for UnityEngine to support state machines",

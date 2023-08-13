@@ -1,267 +1,278 @@
 // Copyright © 2022-2023 Nikolay Melnikov. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
-using System;
-using Depra.StateMachines.Abstract;
-using Depra.StateMachines.Finite;
+using Depra.Stateful.Abstract;
+using Depra.Stateful.Finite;
 using JetBrains.Annotations;
 using UnityEngine;
-using UnityEngine.Events;
-using static Depra.StateMachines.Unity.Runtime.Constants;
+using static Depra.Stateful.Unity.Runtime.Constants;
 
-namespace Depra.StateMachines.Unity.Runtime
+namespace Depra.Stateful.Unity.Runtime
 {
-    [AddComponentMenu(MODULE_PATH + F_STATE_MACHINE)]
-    [RequireComponent(typeof(StateMachineInitialization))]
-    public sealed class StateMachineBehaviour : MonoBehaviour, IStateMachine
-    {
-        [SerializeField] private StateBehavior _startingState;
-        [SerializeField] private StateBehavior _currentState;
-        [SerializeField] private UnityEvent<StateBehavior> _onStateChanged;
+	[AddComponentMenu(MODULE_PATH + DISPLAY_NAME)]
+	public sealed class StateMachineBehaviour : MonoBehaviour, IStateMachine<StateBehavior>, IStateMachine<IState>
+	{
+		internal const string DISPLAY_NAME = "State Machine";
 
-        [Tooltip("Can States within this StateMachine be reentered?")] [SerializeField]
-        private bool _allowReentry;
+		[SerializeField] private StateBehavior _startingState;
+		[SerializeField] private StateBehavior _currentState;
+		[SerializeField] private UnityStateEvent _onStateChanged;
 
-        [SerializeField] private bool _verbose;
+		[Tooltip("Can States within this StateMachine be reentered?")]
+		[SerializeField] private bool _allowReentry;
+		[SerializeField] private bool _verbose;
 
-        private IStateMachine _stateMachine;
+		private IStateMachine _stateMachine;
 
-        public event Action<IState> StateChanged;
+		/// <summary>
+		/// Are we at the first state in this state machine.
+		/// </summary>
+		[UsedImplicitly]
+		public bool AtFirst { get; private set; }
 
-        /// <summary>
-        /// Are we at the first state in this state machine.
-        /// </summary>
-        [UsedImplicitly]
-        public bool AtFirst { get; private set; }
+		/// <summary>
+		/// Are we at the last state in this state machine.
+		/// </summary>
+		[UsedImplicitly]
+		public bool AtLast { get; private set; }
 
-        /// <summary>
-        /// Are we at the last state in this state machine.
-        /// </summary>
-        [UsedImplicitly]
-        public bool AtLast { get; private set; }
+		public event StateChangedDelegate StateChanged;
 
-        /// <summary>
-        /// Returns the current state.
-        /// </summary>
-        [UsedImplicitly]
-        public StateBehavior CurrentState => _currentState;
+		event StateChangedDelegate IStateMachine<IState>.StateChanged
+		{
+			add => StateChanged += value;
+			remove => StateChanged -= value;
+		}
 
-        /// <summary>
-        /// Returns the current state.
-        /// <remarks>For compatibility with <see cref="IStateMachine"/> interface.</remarks>
-        /// </summary>
-        IState IStateMachine.CurrentState => _currentState;
+		/// <summary>
+		/// Returns the current state.
+		/// </summary>
+		public StateBehavior CurrentState => _currentState;
 
-        private void OnDestroy()
-        {
-            if (_stateMachine != null)
-            {
-                _stateMachine.StateChanged += OnStateChanged;
-            }
-        }
+		IState IStateMachine<IState>.CurrentState => CurrentState;
 
-        /// <summary>
-        /// Internally used within the framework to auto start the state machine.
-        /// </summary>
-        public void StartMachine()
-        {
-            _stateMachine = new StateMachine(_startingState, _allowReentry);
-            _stateMachine.StateChanged += OnStateChanged;
+		/// <summary>
+		/// Returns the current state.
+		/// <remarks>For compatibility with <see cref="IStateMachine"/> interface.</remarks>
+		/// </summary>
+		//public IState CurrentState => _currentState;
+		private void OnDestroy()
+		{
+			if (_stateMachine != null)
+			{
+				_stateMachine.StateChanged += OnStateChanged;
+			}
+		}
 
-            if (Application.isPlaying && _startingState != null)
-            {
-                ChangeState(_startingState);
-            }
-        }
+		/// <summary>
+		/// Internally used within the framework to auto start the state machine.
+		/// </summary>
+		public void StartMachine()
+		{
+			_stateMachine = new StateMachine(_startingState, _allowReentry);
+			_stateMachine.StateChanged += OnStateChanged;
 
-        /// <summary>
-        /// Change to the next state if possible.
-        /// </summary>
-        [UsedImplicitly]
-        public StateBehavior Next(bool exitIfLast = false)
-        {
-            if (_currentState == null)
-            {
-                return ChangeState(0);
-            }
+			if (Application.isPlaying && _startingState != null)
+			{
+				SwitchState(_startingState);
+			}
+		}
 
-            var currentIndex = _currentState.transform.GetSiblingIndex();
-            if (currentIndex == transform.childCount - 1)
-            {
-                if (exitIfLast)
-                {
-                    Exit();
-                    return null;
-                }
+		/// <summary>
+		/// Change to the next state if possible.
+		/// </summary>
+		[UsedImplicitly]
+		public StateBehavior Next(bool exitIfLast = false)
+		{
+			if (_currentState == null)
+			{
+				return SwitchState(0);
+			}
 
-                return _currentState;
-            }
+			var currentIndex = _currentState.transform.GetSiblingIndex();
+			if (currentIndex != transform.childCount - 1)
+			{
+				return SwitchState(++currentIndex);
+			}
 
-            return ChangeState(++currentIndex);
-        }
+			if (exitIfLast == false)
+			{
+				return _currentState;
+			}
 
-        /// <summary>
-        /// Change to the previous state if possible.
-        /// </summary>
-        [UsedImplicitly]
-        public StateBehavior Previous(bool exitIfFirst = false)
-        {
-            if (_currentState == null)
-            {
-                return ChangeState(0);
-            }
+			Exit();
+			return null;
+		}
 
-            var currentIndex = _currentState.transform.GetSiblingIndex();
-            if (currentIndex == 0)
-            {
-                if (exitIfFirst)
-                {
-                    Exit();
-                    return null;
-                }
+		/// <summary>
+		/// Change to the previous state if possible.
+		/// </summary>
+		[UsedImplicitly]
+		public StateBehavior Previous(bool exitIfFirst = false)
+		{
+			if (_currentState == null)
+			{
+				return SwitchState(0);
+			}
 
-                return _currentState;
-            }
+			var currentIndex = _currentState.transform.GetSiblingIndex();
+			if (currentIndex != 0)
+			{
+				return SwitchState(--currentIndex);
+			}
 
-            return ChangeState(--currentIndex);
-        }
+			if (exitIfFirst == false)
+			{
+				return _currentState;
+			}
 
-        /// <summary>
-        /// Exit the current state.
-        /// </summary>
-        [UsedImplicitly]
-        public void Exit()
-        {
-            if (_currentState == null)
-            {
-                return;
-            }
+			Exit();
+			return null;
+		}
 
-            Log($"(-) {name} EXITED state: {_currentState.name}");
+		/// <summary>
+		/// Exit the current state.
+		/// </summary>
+		[UsedImplicitly]
+		public void Exit()
+		{
+			if (_currentState == null)
+			{
+				return;
+			}
 
-            var currentIndex = _currentState.transform.GetSiblingIndex();
+			Log($"(-) {name} EXITED state: {_currentState.name}");
 
-            // No longer at first:
-            if (currentIndex == 0)
-            {
-                AtFirst = false;
-            }
+			var currentIndex = _currentState.transform.GetSiblingIndex();
 
-            // No longer at last:
-            if (currentIndex == transform.childCount - 1)
-            {
-                AtLast = false;
-            }
+			// No longer at first:
+			if (currentIndex == 0)
+			{
+				AtFirst = false;
+			}
 
-            _currentState.Exit();
-            _currentState = null;
-        }
+			// No longer at last:
+			if (currentIndex == transform.childCount - 1)
+			{
+				AtLast = false;
+			}
 
-        /// <summary>
-        /// Changes the state by state instance.
-        /// </summary>
-        /// <param name="state">New state</param>
-        [UsedImplicitly]
-        public StateBehavior ChangeState(StateBehavior state)
-        {
-            if (_currentState)
-            {
-                if (_allowReentry == false && state == _currentState)
-                {
-                    Log($"State change ignored. State machine {name} already in {state.name} state.");
-                    return null;
-                }
-            }
+			_currentState.Exit();
+			_currentState = null;
+		}
 
-            if (state.transform.parent != transform)
-            {
-                Log($"State {state.name} is not a child of {name} StateMachine state change canceled.");
-                return null;
-            }
+		/// <summary>
+		/// Changes the state by state instance.
+		/// </summary>
+		/// <param name="state">New state</param>
+		[UsedImplicitly]
+		public StateBehavior SwitchState(StateBehavior state)
+		{
+			if (_currentState)
+			{
+				if (_allowReentry == false && state == _currentState)
+				{
+					Log($"{nameof(StateBehavior)} change ignored. " +
+					    $"{nameof(StateMachine)} {name} already in {state.name} state.");
 
-            Enter(state);
+					return null;
+				}
+			}
 
-            return _currentState;
-        }
+			if (state.transform.parent != transform)
+			{
+				Log($"{nameof(StateBehavior)} {state.name} is not a child of {name} " +
+				    $"{nameof(StateMachine)} state change canceled.");
 
-        /// <summary>
-        /// Changes the state by sibling index.
-        /// </summary>
-        /// <param name="childIndex">Sibling index</param>
-        [UsedImplicitly]
-        public StateBehavior ChangeState(int childIndex)
-        {
-            if (childIndex > transform.childCount - 1)
-            {
-                Log($"Index is greater than the amount of states in the StateMachine {gameObject.name} " +
-                    "please verify the index you are trying to change to.");
-            }
+				return null;
+			}
 
-            return ChangeState(transform.GetChild(childIndex).GetComponent<StateBehavior>());
-        }
+			Enter(state);
 
-        /// <summary>
-        /// Changes the state by name.
-        /// </summary>
-        /// <param name="state">State name</param>
-        /// <returns></returns>
-        [UsedImplicitly]
-        public StateBehavior ChangeState(string state)
-        {
-            var found = transform.Find(state);
-            if (found == false)
-            {
-                Log($"{name} does not contain a state by the name of {state} " +
-                    "please verify the name of the state you are trying to reach.");
+			return _currentState;
+		}
 
-                return null;
-            }
+		/// <summary>
+		/// Changes the state by sibling index.
+		/// </summary>
+		/// <param name="childIndex">Sibling index</param>
+		[UsedImplicitly]
+		public StateBehavior SwitchState(int childIndex)
+		{
+			if (childIndex > transform.childCount - 1)
+			{
+				Log($"Index is greater than the amount of states in the {nameof(StateMachine)} " +
+				    $"{gameObject.name} please verify the index you are trying to change to.");
+			}
 
-            return ChangeState(found.GetComponent<StateBehavior>());
-        }
+			return SwitchState(transform.GetChild(childIndex).GetComponent<StateBehavior>());
+		}
 
-        private void Enter(StateBehavior state)
-        {
-            _currentState = state;
-            var index = _currentState.transform.GetSiblingIndex();
+		/// <summary>
+		/// Changes the state by name.
+		/// </summary>
+		/// <param name="state">State name</param>
+		/// <returns></returns>
+		[UsedImplicitly]
+		public StateBehavior SwitchState(string state)
+		{
+			var found = transform.Find(state);
+			if (found != false)
+			{
+				return SwitchState(found.GetComponent<StateBehavior>());
+			}
 
-            // Entering first:
-            if (index == 0)
-            {
-                AtFirst = true;
-            }
+			Log($"{name} does not contain a state by the name of {state} " +
+			    "please verify the name of the state you are trying to reach.");
 
-            // Entering last:
-            if (index == transform.childCount - 1)
-            {
-                AtLast = true;
-            }
+			return null;
+		}
 
-            _stateMachine.ChangeState(state);
+		private void Enter(StateBehavior state)
+		{
+			_currentState = state;
+			var index = _currentState.transform.GetSiblingIndex();
 
-            Log($"(+) {name} ENTERED state {state.name}");
-        }
+			// Entering first:
+			if (index == 0)
+			{
+				AtFirst = true;
+			}
 
-        private void OnStateChanged(IState currentState)
-        {
-            StateChanged?.Invoke(currentState);
-            _onStateChanged.Invoke(_currentState);
-        }
+			// Entering last:
+			if (index == transform.childCount - 1)
+			{
+				AtLast = true;
+			}
 
-        private void Log(string message)
-        {
-            if (_verbose)
-            {
-                Debug.Log(message, gameObject);
-            }
-        }
+			_stateMachine.SwitchState(state);
 
-        /// <summary>
-        /// Changes the state by state instance.
-        /// </summary>
-        /// <remarks>For compatibility with the <see cref="IStateMachine"/> interface.</remarks>
-        /// <param name="state">New state</param>
-        void IStateMachine.ChangeState(IState state) =>
-            ChangeState(state as StateBehavior);
-    }
+			Log($"(+) {name} ENTERED state {state.name}");
+		}
+
+		private void OnStateChanged(IState currentState)
+		{
+			StateChanged?.Invoke(currentState);
+			_onStateChanged.Invoke(_currentState);
+		}
+
+		private void Log(string message)
+		{
+			if (_verbose)
+			{
+				Debug.Log(message, gameObject);
+			}
+		}
+
+		void IStateMachine<StateBehavior>.SwitchState(StateBehavior to) =>
+			SwitchState(to);
+
+		/// <summary>
+		/// Changes the state by state instance.
+		/// </summary>
+		/// <remarks>For compatibility with the <see cref="IStateMachine"/> interface.</remarks>
+		/// <param name="state">New state.</param>
+		void IStateMachine<IState>.SwitchState(IState state) =>
+			SwitchState(state as StateBehavior);
+	}
 }
